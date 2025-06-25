@@ -1,56 +1,55 @@
 import express from 'express';
-import cors from "cors";
-import dotenv from "dotenv";
-import fs from "fs";
-import pkg from 'pg';
-const { Pool } = pkg;
+import cors from 'cors';
+import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Load environment variables
 dotenv.config();
 
-const { DATABASE_URL, PGHOST, PGDATABASE, PGUSER, PGPASSWORD, PGPORT = 5432 } = process.env;
-
-const pool = new Pool(
-  DATABASE_URL
-    ? { 
-        connectionString: DATABASE_URL, 
-        ssl: { require: true } 
-      }
-    : {
-        host: PGHOST,
-        database: PGDATABASE,
-        user: PGUSER,
-        password: PGPASSWORD,
-        port: Number(PGPORT),
-        ssl: { require: true },
-      }
-);
-
-const client = await pool.connect();
-
-const app = express();
-
-// ESM workaround for __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const port = process.env.PORT || 3000;
-app.use(cors());
-app.use(express.json({ limit: "5mb" }));
+const app = express();
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
-// Serve static files from the 'public' directory
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from React build
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get("/", (req, res) => {
-  res.json({ message: "cofounder backend boilerplate :)" });
+// Basic API routes
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Catch-all route for SPA routing
+app.get('/api/info', (req, res) => {
+  res.json({
+    name: 'Personal Finance Tracker API',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Catch-all handler: send back React's index.html file for SPA routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-// Start the server
-app.listen(3000, '0.0.0.0', () => {
-  console.log(`Server running on port 3000 and listening on 0.0.0.0`);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
+
+// Start server
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+  console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+export default app;
